@@ -1,0 +1,421 @@
+<title>山支度帳</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2e6a57">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: 地形図の余白に置いた装備帳。上に山行条件と集計、下にカテゴリ別の2段組チェックリスト */
+:root {
+  --bg: #edf0ea;
+  --surface: #f8faf6;
+  --ink: #1c2b2a;
+  --muted: #5b6b66;
+  --line: #cbd3cb;
+  --accent: #2e6a57;
+  --accent-soft: #d6e6dd;
+  --must: #9a5a12;
+  --must-soft: #f1e2cc;
+  --contour: rgba(154, 90, 18, .13);
+  --f-display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --f-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "Consolas", monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111917; --surface: #19231f; --ink: #e3eae5; --muted: #93a39d; --line: #2d3b36;
+    --accent: #72b99e; --accent-soft: #20372e; --must: #dba455; --must-soft: #3a2c17;
+    --contour: rgba(219, 164, 85, .10);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111917; --surface: #19231f; --ink: #e3eae5; --muted: #93a39d; --line: #2d3b36;
+  --accent: #72b99e; --accent-soft: #20372e; --must: #dba455; --must-soft: #3a2c17;
+  --contour: rgba(219, 164, 85, .10);
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--f-body); font-size: 15px; line-height: 1.6;
+  padding-inline: 16px; padding-block: 0 48px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; }
+
+header.top {
+  position: relative; padding-block: 36px 20px; overflow: hidden;
+}
+header.top::before {
+  content: ""; position: absolute; inset: -40% -10% auto auto; width: 560px; height: 560px; max-width: 120%;
+  background: repeating-radial-gradient(ellipse at 62% 48%, transparent 0 17px, var(--contour) 17px 18px);
+  pointer-events: none; z-index: 0;
+}
+header.top > * { position: relative; z-index: 1; }
+.eyebrow { font-size: 12px; letter-spacing: .14em; color: var(--muted); font-weight: 500; }
+h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(36px, 7vw, 56px); line-height: 1.1; margin: 4px 0 8px; letter-spacing: .02em; }
+.lede { color: var(--muted); max-width: 38em; margin: 0; text-wrap: pretty; }
+
+.controls { display: grid; gap: 14px; margin-top: 22px; }
+.ctl-label { font-size: 12px; letter-spacing: .1em; color: var(--muted); font-weight: 700; margin-bottom: 6px; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); overflow: hidden; }
+.seg button {
+  font: inherit; font-weight: 500; border: 0; background: transparent; color: var(--ink);
+  padding: 9px 18px; cursor: pointer; border-right: 1px solid var(--line);
+}
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  border-radius: 999px; padding: 6px 14px; cursor: pointer;
+}
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.chip[aria-pressed="true"]::before { content: "✓ "; }
+button:focus-visible, input:focus-visible, select:focus-visible, label.item:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.summary {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 24px; padding-block: 12px;
+}
+.stat { display: flex; align-items: baseline; gap: 8px; }
+.stat .k { font-size: 12px; color: var(--muted); letter-spacing: .08em; font-weight: 700; }
+.stat .v { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 18px; }
+.stat .v small { font-size: 13px; color: var(--muted); font-weight: 400; }
+.meter { flex: 1 1 160px; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; min-width: 120px; }
+.meter i { display: block; height: 100%; background: var(--must); width: 0; transition: width .3s; }
+.meter.done i { background: var(--accent); }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn {
+  font: inherit; font-size: 13px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  border-radius: var(--r); padding: 6px 12px; cursor: pointer;
+}
+.btn.warn { border-color: var(--must); color: var(--must); }
+.btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+.board { columns: 2 440px; column-gap: 28px; margin-top: 24px; }
+section.cat { break-inside: avoid; margin-bottom: 28px; }
+.cat h2 {
+  font-size: 16px; font-weight: 700; margin: 0 0 6px; display: flex; justify-content: space-between; align-items: baseline;
+  border-bottom: 2px solid var(--ink); padding-bottom: 4px; text-wrap: balance;
+}
+.cat h2 .n { font-family: var(--f-mono); font-size: 13px; color: var(--muted); font-weight: 400; }
+ul.items { list-style: none; margin: 0; padding: 0; }
+ul.items li { border-bottom: 1px dashed var(--line); }
+label.item {
+  display: grid; grid-template-columns: 22px 1fr auto; gap: 2px 12px; align-items: start;
+  padding: 9px 2px; cursor: pointer; border-radius: 4px;
+}
+label.item input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.box {
+  width: 20px; height: 20px; border: 2px solid var(--muted); border-radius: 4px; margin-top: 2px;
+  display: grid; place-items: center; background: var(--surface);
+}
+.box svg { width: 13px; height: 13px; opacity: 0; }
+label.item input:checked + .box { background: var(--accent); border-color: var(--accent); }
+label.item input:checked + .box svg { opacity: 1; }
+.name { font-weight: 500; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+label.item input:checked ~ .body .name { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--muted); }
+.note { grid-column: 2 / 4; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.g { font-family: var(--f-mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; padding-top: 2px; }
+.tag { font-size: 11px; font-weight: 700; letter-spacing: .06em; border-radius: 3px; padding: 0 6px; line-height: 18px; }
+.tag.must { background: var(--must-soft); color: var(--must); }
+.tag.my { background: var(--accent-soft); color: var(--accent); }
+.del { font: inherit; font-size: 12px; border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 4px; text-decoration: underline; }
+
+.add { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.add input, .add select {
+  font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  border-radius: var(--r); padding: 7px 10px;
+}
+.add input { flex: 1 1 180px; min-width: 0; }
+.empty { color: var(--muted); font-size: 14px; padding: 24px 0; }
+
+footer { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 16px; color: var(--muted); font-size: 13px; display: grid; gap: 6px; }
+footer b { color: var(--ink); }
+@media (max-width: 520px) {
+  .seg button { padding: 8px 12px; }
+  .summary { gap: 8px 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">登山装備チェックリスト</div>
+    <h1>山支度帳</h1>
+    <p class="lede">山行タイプと条件を選ぶと、必要な装備だけが並びます。チェック状態はこの端末に保存されます。重量は一般的な製品の目安で、車に置いておくもの（車中泊・下山後）は含みません。</p>
+    <div class="controls">
+      <div>
+        <div class="ctl-label">山行タイプ</div>
+        <div class="seg" id="type-seg" role="group" aria-label="山行タイプ"></div>
+      </div>
+      <div>
+        <div class="ctl-label">条件（複数可）</div>
+        <div class="chips" id="cond-chips" role="group" aria-label="条件"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="summary" aria-live="polite">
+    <div class="stat"><span class="k">必携</span><span class="v" id="s-must">0<small>/0</small></span></div>
+    <div class="meter" id="s-meter"><i></i></div>
+    <div class="stat"><span class="k">全体</span><span class="v" id="s-all">0<small>/0</small></span></div>
+    <div class="stat"><span class="k">重量目安</span><span class="v" id="s-kg">0.0<small> kg</small></span></div>
+    <div class="tools">
+      <button class="btn" id="btn-unchecked" type="button" aria-pressed="false">未チェックのみ</button>
+      <button class="btn" id="btn-reset" type="button">チェックを外す</button>
+    </div>
+  </div>
+
+  <main class="board" id="board"></main>
+
+  <section class="cat" style="max-width: 520px">
+    <h2>マイアイテムを追加</h2>
+    <form class="add" id="add-form">
+      <input id="add-name" type="text" placeholder="例：カメラ、行動食の追加分" aria-label="アイテム名" maxlength="40">
+      <select id="add-cat" aria-label="カテゴリ"></select>
+      <button class="btn" type="submit">追加</button>
+    </form>
+  </section>
+
+  <footer>
+    <div><b>出発前に：</b>登山計画書を家族と登山口（またはコンパス等のオンライン）に提出し、下山予定時刻を共有しておきましょう。</div>
+    <div><b>気温の目安：</b>標高が100m上がるごとに約0.6℃下がります。麓が20℃なら標高3,000mの稜線は約2℃です（麓0m換算）。風速1m/sごとに体感温度はさらに約1℃下がります。</div>
+  </footer>
+</div>
+
+<script>
+const TYPES = [
+  { id: "day",  label: "日帰り" },
+  { id: "hut",  label: "山小屋泊" },
+  { id: "tent", label: "テント泊" },
+];
+const CONDS = [
+  { id: "rain",   label: "雨予報" },
+  { id: "winter", label: "冬・残雪期" },
+  { id: "rock",   label: "岩稜・落石地帯" },
+  { id: "car",    label: "前日車中泊" },
+];
+const CATS = [
+  { id: "car",   label: "前日車中泊（車内に積むもの）" },
+  { id: "wear",  label: "ウェア" },
+  { id: "pack",  label: "ザック・収納" },
+  { id: "move",  label: "行動装備" },
+  { id: "food",  label: "水・食料" },
+  { id: "safe",  label: "安全・緊急" },
+  { id: "docs",  label: "書類・お金・衛生" },
+  { id: "hut",   label: "山小屋泊" },
+  { id: "tent",  label: "テント泊" },
+  { id: "cond",  label: "条件別の追加装備" },
+  { id: "after", label: "下山後のお風呂・着替え（車に置いておく）" },
+  { id: "my",    label: "マイアイテム" },
+];
+const ALL = ["day", "hut", "tent"];
+// req: "must" | "rec"、またはタイプ別 {day, hut, tent}。conds があれば、いずれかの条件が選ばれたときだけ表示
+const ITEMS = [
+  { id: "rainwear", cat: "wear", name: "レインウェア上下", note: "防水透湿素材。晴れ予報でも必携で、風よけ・防寒着を兼ねる", g: 450, req: "must", t: ALL },
+  { id: "base", cat: "wear", name: "ベースレイヤー（化繊・ウール）", note: "綿は汗冷えするので避ける", g: 150, req: "must", t: ALL },
+  { id: "mid", cat: "wear", name: "ミッドレイヤー（フリース等）", g: 250, req: "must", t: ALL },
+  { id: "down", cat: "wear", name: "防寒着（薄手ダウン・化繊綿）", note: "稜線の休憩や朝夕の冷え込みに", g: 250, req: { day: "rec", hut: "must", tent: "must" }, t: ALL },
+  { id: "pants", cat: "wear", name: "トレッキングパンツ", g: 300, req: "must", t: ALL },
+  { id: "boots", cat: "wear", name: "登山靴", note: "履き慣らしたもの。靴ひもの予備もあると安心", g: 1200, req: "must", t: ALL },
+  { id: "socks", cat: "wear", name: "登山用靴下", g: 80, req: "must", t: ALL },
+  { id: "hat", cat: "wear", name: "帽子", note: "日差し・落石・保温。冬季はニット帽", g: 80, req: "must", t: ALL },
+  { id: "gloves", cat: "wear", name: "手袋（薄手）", note: "鎖場・岩場での手の保護にも", g: 50, req: "must", t: ALL },
+  { id: "change", cat: "wear", name: "着替え（下着・靴下）", g: 200, req: "must", t: ["hut", "tent"] },
+  { id: "gaiter-neck", cat: "wear", name: "ネックゲイター", g: 40, req: "rec", t: ALL },
+
+  { id: "pack", cat: "pack", name: "ザック", note: "目安：日帰り20〜30L、小屋泊30〜40L、テント泊45〜60L", g: 1100, req: "must", t: ALL },
+  { id: "packcover", cat: "pack", name: "ザックカバー", g: 100, req: "must", t: ALL },
+  { id: "drybag", cat: "pack", name: "防水スタッフバッグ", note: "着替え・電子機器は中で分けて防水", g: 80, req: { day: "rec", hut: "must", tent: "must" }, t: ALL },
+  { id: "poles", cat: "pack", name: "トレッキングポール", note: "下りの膝負担を減らす", g: 450, req: "rec", t: ALL },
+
+  { id: "map", cat: "move", name: "紙の地図＋コンパス", note: "スマホの電池切れ・故障に備える", g: 60, req: "must", t: ALL },
+  { id: "phone", cat: "move", name: "スマホ（地図をオフライン保存）", note: "YAMAP・ヤマレコ等で事前にダウンロード", g: 200, req: "must", t: ALL },
+  { id: "battery", cat: "move", name: "モバイルバッテリー＋ケーブル", g: 200, req: "must", t: ALL },
+  { id: "headlamp", cat: "move", name: "ヘッドランプ＋予備電池", note: "日帰りでも必携。下山が遅れたときの必需品", g: 90, req: "must", t: ALL },
+  { id: "watch", cat: "move", name: "腕時計（高度計付き）", g: 60, req: "rec", t: ALL },
+  { id: "sun", cat: "move", name: "サングラス・日焼け止め", g: 60, req: "rec", t: ALL },
+
+  { id: "water", cat: "food", name: "水 1.5〜2L", note: "夏場や水場のないルートは多めに", g: 2000, req: "must", t: ALL },
+  { id: "snack", cat: "food", name: "行動食", note: "1時間に200kcal程度をこまめに", g: 300, req: "must", t: ALL },
+  { id: "lunch", cat: "food", name: "昼食", g: 250, req: "must", t: ALL },
+  { id: "emerg-food", cat: "food", name: "非常食（予定外の1食分）", g: 200, req: "must", t: ALL },
+  { id: "thermos", cat: "food", name: "保温ボトル（お湯・温かい飲み物）", g: 350, req: "rec", t: ALL },
+
+  { id: "firstaid", cat: "safe", name: "ファーストエイドキット", note: "絆創膏、消毒、ガーゼ、三角巾、ポイズンリムーバー", g: 200, req: "must", t: ALL },
+  { id: "meds", cat: "safe", name: "常備薬", note: "持病の薬、鎮痛剤、胃腸薬", g: 30, req: "must", t: ALL },
+  { id: "esheet", cat: "safe", name: "エマージェンシーシート", g: 60, req: "must", t: ALL },
+  { id: "tsuelt", cat: "safe", name: "ツエルト", note: "ビバークや悪天時の避難に", g: 300, req: "rec", t: ["day", "hut"] },
+  { id: "tape", cat: "safe", name: "テーピング", note: "捻挫・靴擦れの応急処置", g: 50, req: "rec", t: ALL },
+  { id: "whistle", cat: "safe", name: "ホイッスル", g: 10, req: "rec", t: ALL },
+  { id: "bell", cat: "safe", name: "熊鈴・熊スプレー", note: "クマの出没情報がある山域では必携", g: 300, req: "rec", t: ALL },
+
+  { id: "plan", cat: "docs", name: "登山計画書の提出", note: "家族への共有＋登山口ポストまたはコンパス", g: 0, req: "must", t: ALL },
+  { id: "insurance-card", cat: "docs", name: "健康保険証（コピー可）", g: 10, req: "must", t: ALL },
+  { id: "mt-insurance", cat: "docs", name: "山岳保険の加入確認", note: "遭難救助費用をカバーするもの", g: 0, req: "rec", t: ALL },
+  { id: "cash", cat: "docs", name: "現金（100円玉を多めに）", note: "山小屋はカード不可が多い。トイレ使用料は100〜200円", g: 50, req: "must", t: ALL },
+  { id: "toilet", cat: "docs", name: "携帯トイレ", note: "トイレのない山域や長い縦走では必携", g: 100, req: "must", t: ALL },
+  { id: "tissue", cat: "docs", name: "ティッシュ・ウェットティッシュ", g: 50, req: "must", t: ALL },
+  { id: "trash", cat: "docs", name: "ゴミ袋", note: "ゴミはすべて持ち帰る", g: 20, req: "must", t: ALL },
+
+  { id: "hut-res", cat: "hut", name: "山小屋の予約確認", note: "予約制の小屋が増えている。キャンセル連絡先も控える", g: 0, req: "must", t: ["hut"] },
+  { id: "toiletry", cat: "hut", name: "洗面用具（歯ブラシ等）", note: "山小屋では歯磨き粉・石けんが使えないことが多い", g: 80, req: "rec", t: ["hut", "tent"] },
+  { id: "earplug", cat: "hut", name: "耳栓・アイマスク", g: 20, req: "rec", t: ["hut", "tent"] },
+  { id: "liner", cat: "hut", name: "インナーシーツ", g: 150, req: "rec", t: ["hut"] },
+
+  { id: "tent", cat: "tent", name: "テント（本体・フライ・ポール・ペグ）", g: 1500, req: "must", t: ["tent"] },
+  { id: "sleeping", cat: "tent", name: "シュラフ", note: "最低使用温度を山頂付近の気温に合わせる", g: 900, req: "must", t: ["tent"] },
+  { id: "mat", cat: "tent", name: "スリーピングマット", g: 400, req: "must", t: ["tent"] },
+  { id: "stove", cat: "tent", name: "バーナー＋ガス缶", note: "ガス缶は空港経由だと持ち込めない。現地で購入", g: 350, req: "must", t: ["tent"] },
+  { id: "cooker", cat: "tent", name: "クッカー・カトラリー", g: 250, req: "must", t: ["tent"] },
+  { id: "lighter", cat: "tent", name: "ライター", g: 20, req: "must", t: ["tent"] },
+  { id: "meals", cat: "tent", name: "夕食・朝食（泊数分）", g: 800, req: "must", t: ["tent"] },
+  { id: "tent-res", cat: "tent", name: "テント場の予約・幕営料の確認", g: 0, req: "must", t: ["tent"] },
+  { id: "filter", cat: "tent", name: "浄水器・水を運ぶソフトボトル", g: 120, req: "rec", t: ["tent"] },
+  { id: "lantern", cat: "tent", name: "テント用ランタン", g: 80, req: "rec", t: ["tent"] },
+
+  { id: "umbrella", cat: "cond", name: "折りたたみ傘", note: "樹林帯の小雨に便利。稜線の強風では使わない", g: 200, req: "rec", t: ALL, conds: ["rain"] },
+  { id: "spats", cat: "cond", name: "ゲイター（スパッツ）", note: "雨・泥・雪の侵入を防ぐ", g: 200, req: "must", t: ALL, conds: ["rain", "winter"] },
+  { id: "spare-socks", cat: "cond", name: "替えの靴下", g: 80, req: "must", t: ALL, conds: ["rain"] },
+  { id: "crampons", cat: "cond", name: "アイゼン（軽アイゼン／12本爪）", note: "ルートの積雪・凍結状況で使い分ける", g: 800, req: "must", t: ALL, conds: ["winter"] },
+  { id: "axe", cat: "cond", name: "ピッケル", note: "急斜面の雪渓・稜線歩き", g: 450, req: "rec", t: ALL, conds: ["winter"] },
+  { id: "overglove", cat: "cond", name: "厚手グローブ＋オーバーグローブ", g: 200, req: "must", t: ALL, conds: ["winter"] },
+  { id: "goggles", cat: "cond", name: "ゴーグル", g: 150, req: "rec", t: ALL, conds: ["winter"] },
+  { id: "balaclava", cat: "cond", name: "バラクラバ", g: 60, req: "rec", t: ALL, conds: ["winter"] },
+  { id: "avy", cat: "cond", name: "ビーコン・ショベル・プローブ", note: "雪崩の危険がある山域では必携", g: 1500, req: "rec", t: ALL, conds: ["winter"] },
+  { id: "helmet", cat: "cond", name: "ヘルメット", note: "北アルプスの岩稜などでは着用が推奨されている", g: 300, req: "must", t: ALL, conds: ["rock"] },
+  { id: "sling", cat: "cond", name: "スリング・カラビナ", note: "ルートによっては自己確保用に", g: 150, req: "rec", t: ALL, conds: ["rock"] },
+
+  // 車に積むものは背負わないので g: 0（重量目安に含めない）
+  { id: "car-parking", cat: "car", name: "駐車場の事前確認", note: "車中泊の可否、満車になる時間帯、トイレの有無、駐車料金", g: 0, req: "must", t: ALL, conds: ["car"] },
+  { id: "car-sleeping", cat: "car", name: "寝袋・毛布", note: "登山口の駐車場は夏でも夜は冷える。山行用シュラフとは別に用意すると楽", g: 0, req: "must", t: ALL, conds: ["car"] },
+  { id: "car-mat", cat: "car", name: "車中泊マット", note: "シートの段差を埋めて平らにする", g: 0, req: "must", t: ALL, conds: ["car"] },
+  { id: "car-shade", cat: "car", name: "サンシェード・窓の目隠し", note: "外からの視線と街灯・朝日を遮る", g: 0, req: "must", t: ALL, conds: ["car"] },
+  { id: "car-dinner", cat: "car", name: "前日の夕食・当日の朝食", note: "登山口周辺は店がないことが多い。朝は出発前にすぐ食べられるもの", g: 0, req: "must", t: ALL, conds: ["car"] },
+  { id: "car-water", cat: "car", name: "飲料水（夜・朝の分）", note: "山行用の水とは別に", g: 0, req: "must", t: ALL, conds: ["car"] },
+  { id: "car-light", cat: "car", name: "車内用ランタン", note: "室内灯の点けっぱなしはバッテリー上がりの原因", g: 0, req: "rec", t: ALL, conds: ["car"] },
+  { id: "car-pillow", cat: "car", name: "枕", g: 0, req: "rec", t: ALL, conds: ["car"] },
+  { id: "car-earplug", cat: "car", name: "耳栓・アイマスク", note: "早朝に到着する車のドア音・ライト対策", g: 0, req: "rec", t: ALL, conds: ["car"] },
+  { id: "car-toiletry", cat: "car", name: "歯ブラシ・洗面用具", g: 0, req: "rec", t: ALL, conds: ["car"] },
+  { id: "car-net", cat: "car", name: "ウィンドウネット・虫除け", note: "夏に窓を開けて換気するとき用", g: 0, req: "rec", t: ALL, conds: ["car"] },
+  { id: "car-charger", cat: "car", name: "車載充電器（シガーソケット）", note: "スマホ・モバイルバッテリーを満充電にしておく", g: 0, req: "rec", t: ALL, conds: ["car"] },
+
+  { id: "after-onsen", cat: "after", name: "日帰り温泉の場所・営業時間の確認", note: "下山予定時刻と最終受付時刻を照らし合わせ、定休日も確認", g: 0, req: "must", t: ALL },
+  { id: "after-fee", cat: "after", name: "入浴料（現金）", note: "券売機が現金のみの施設が多い", g: 0, req: "must", t: ALL },
+  { id: "after-towel", cat: "after", name: "タオル（バス・フェイス）", g: 0, req: "must", t: ALL },
+  { id: "after-clothes", cat: "after", name: "着替え一式（下着・シャツ・ズボン・靴下）", g: 0, req: "must", t: ALL },
+  { id: "after-bag", cat: "after", name: "汚れ物袋", note: "汗や雨で濡れたウェア・靴を分けて入れる。大きめのビニール袋2〜3枚", g: 0, req: "must", t: ALL },
+  { id: "after-shoes", cat: "after", name: "サンダル・替えの靴", note: "登山靴を脱いで運転・入浴できる", g: 0, req: "rec", t: ALL },
+  { id: "after-shampoo", cat: "after", name: "シャンプー・ボディソープ", note: "置いていない施設もある", g: 0, req: "rec", t: ALL },
+  { id: "after-skincare", cat: "after", name: "スキンケア・ヘアブラシ", g: 0, req: "rec", t: ALL },
+  { id: "after-drink", cat: "after", name: "帰りの飲み物", note: "クーラーボックスに入れておくと下山後にうれしい", g: 0, req: "rec", t: ALL },
+];
+
+const KEY = "yamajitaku-v1";
+let state = { type: "day", conds: [], checked: {}, custom: [], onlyUnchecked: false };
+try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) state = Object.assign(state, s); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
+
+const level = it => typeof it.req === "string" ? it.req : it.req[state.type];
+const visible = () => ITEMS.filter(it => it.t.includes(state.type) && (!it.conds || it.conds.some(c => state.conds.includes(c))))
+  .concat(state.custom.map(c => ({ ...c, req: "my", t: ALL, g: 0 })));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const CHECK = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7.5l3.2 3L12 3.5" fill="none" stroke="var(--surface)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function renderControls() {
+  document.getElementById("type-seg").innerHTML = TYPES.map(t =>
+    `<button type="button" id="type-${t.id}" data-type="${t.id}" aria-pressed="${state.type === t.id}">${t.label}</button>`).join("");
+  document.getElementById("cond-chips").innerHTML = CONDS.map(c =>
+    `<button type="button" class="chip" id="cond-${c.id}" data-cond="${c.id}" aria-pressed="${state.conds.includes(c.id)}">${c.label}</button>`).join("");
+  document.getElementById("btn-unchecked").setAttribute("aria-pressed", state.onlyUnchecked);
+}
+
+function renderBoard() {
+  const vis = visible();
+  const html = CATS.map(cat => {
+    const all = vis.filter(it => it.cat === cat.id);
+    if (!all.length) return "";
+    const done = all.filter(it => state.checked[it.id]).length;
+    const shown = state.onlyUnchecked ? all.filter(it => !state.checked[it.id]) : all;
+    if (!shown.length) return "";
+    shown.sort((a, b) => (level(a) === "must" ? 0 : 1) - (level(b) === "must" ? 0 : 1));
+    return `<section class="cat"><h2>${cat.label}<span class="n">${done}/${all.length}</span></h2><ul class="items">` +
+      shown.map(it => {
+        const lv = level(it);
+        const tag = lv === "must" ? '<span class="tag must">必携</span>' : lv === "my" ? '<span class="tag my">マイ</span>' : "";
+        const del = lv === "my" ? `<button type="button" class="del" data-del="${it.id}">削除</button>` : "";
+        return `<li><label class="item"><input type="checkbox" id="chk-${it.id}" data-id="${it.id}" ${state.checked[it.id] ? "checked" : ""}>` +
+          `<span class="box">${CHECK}</span><span class="body"><span class="name">${esc(it.name)}${tag}${del}</span></span>` +
+          `<span class="g">${it.g ? it.g.toLocaleString() + " g" : ""}</span>` +
+          (it.note ? `<span class="note">${esc(it.note)}</span>` : "") + `</label></li>`;
+      }).join("") + `</ul></section>`;
+  }).join("");
+  document.getElementById("board").innerHTML = html || '<p class="empty">すべてチェック済みです。気をつけて行ってらっしゃい。</p>';
+  renderSummary(vis);
+}
+
+function renderSummary(vis) {
+  const must = vis.filter(it => level(it) === "must");
+  const mustDone = must.filter(it => state.checked[it.id]).length;
+  const allDone = vis.filter(it => state.checked[it.id]).length;
+  const kg = vis.reduce((s, it) => s + it.g, 0) / 1000;
+  document.getElementById("s-must").innerHTML = `${mustDone}<small>/${must.length}</small>`;
+  document.getElementById("s-all").innerHTML = `${allDone}<small>/${vis.length}</small>`;
+  document.getElementById("s-kg").innerHTML = `${kg.toFixed(1)}<small> kg（着用含む）</small>`;
+  const m = document.getElementById("s-meter");
+  m.querySelector("i").style.width = must.length ? (mustDone / must.length * 100) + "%" : "0";
+  m.classList.toggle("done", must.length > 0 && mustDone === must.length);
+}
+
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-type]"), c = e.target.closest("[data-cond]"), d = e.target.closest("[data-del]");
+  if (t) { state.type = t.dataset.type; }
+  else if (c) { const id = c.dataset.cond; state.conds = state.conds.includes(id) ? state.conds.filter(x => x !== id) : [...state.conds, id]; }
+  else if (d) { e.preventDefault(); state.custom = state.custom.filter(x => x.id !== d.dataset.del); delete state.checked[d.dataset.del]; }
+  else return;
+  save(); renderControls(); renderBoard();
+});
+document.getElementById("board").addEventListener("change", e => {
+  const id = e.target.dataset.id; if (!id) return;
+  if (e.target.checked) state.checked[id] = true; else delete state.checked[id];
+  save();
+  if (state.onlyUnchecked) setTimeout(renderBoard, 250); else renderBoard();
+});
+document.getElementById("btn-unchecked").addEventListener("click", () => {
+  state.onlyUnchecked = !state.onlyUnchecked; save(); renderControls(); renderBoard();
+});
+const resetBtn = document.getElementById("btn-reset");
+let resetTimer;
+resetBtn.addEventListener("click", () => {
+  if (!resetBtn.classList.contains("warn")) {
+    resetBtn.classList.add("warn"); resetBtn.textContent = "もう一度押すと全解除";
+    resetTimer = setTimeout(() => { resetBtn.classList.remove("warn"); resetBtn.textContent = "チェックを外す"; }, 3000);
+    return;
+  }
+  clearTimeout(resetTimer); state.checked = {}; save();
+  resetBtn.classList.remove("warn"); resetBtn.textContent = "チェックを外す"; renderBoard();
+});
+const addCat = document.getElementById("add-cat");
+addCat.innerHTML = CATS.filter(c => c.id !== "cond").map(c => `<option value="${c.id}"${c.id === "my" ? " selected" : ""}>${c.label}</option>`).join("");
+document.getElementById("add-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const inp = document.getElementById("add-name"), name = inp.value.trim();
+  if (!name) { inp.focus(); return; }
+  state.custom.push({ id: "my-" + Date.now(), cat: addCat.value, name });
+  inp.value = ""; save(); renderBoard();
+});
+
+renderControls(); renderBoard();
+
+// GitHub Pages で開いたときだけ、圏外用のキャッシュを登録
+if ("serviceWorker" in navigator && location.protocol === "https:" && !location.hostname.endsWith("claude.ai")) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+</script>
